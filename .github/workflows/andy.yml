@@ -1,0 +1,22 @@
+name: Compile test
+
+on:
+  pull_request:
+
+jobs:
+  build-pr:
+    strategy:
+      fail-fast: true
+      matrix:
+        machine:
+          - qcm6490-idp
+          #- qcs6490-rb3gen2-core-kit
+          #- sa8775p-ride-sx
+    runs-on: [self-hosted, x86]
+    name: ${{ matrix.machine }}/poky/systemd
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: foo
+        run: echo hello world
