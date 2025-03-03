@@ -1,0 +1,58 @@
+name: Build Test with SDK
+
+on: [push, pull_request]
+
+env:
+  PERSIST_DIR: /srv/gh-runners/quic-qrb-ros
+  DL_DIR: /srv/gh-runners/quic-qrb-ros/downloads
+  WORKSPACE: ${{ github.workspace }}/ros_ws
+  SDK_DIR: ${{ github.workspace }}/sdk
+
+jobs:
+  build:
+    runs-on: [self-hosted, x86]
+    timeout-minutes: 720
+    steps:
+      - name: Set up SDK
+        run: |
+          set -x
+          if [ -e ${PERSIST_DIR} ] && [ -r ${PERSIST_DIR} ] && [ -x ${PERSIST_DIR} ];then
+            echo "Setting up SDK..."  
+            umask 022
+            ${PERSIST_DIR}/sdk/qcom-robotics-ros2-humble-x86_64-qcom-robotics-full-image-armv8-2a-qcs6490-rb3gen2-vision-kit-toolchain-1.0.sh <<EOF
+            ${SDK_DIR}
+            Y
+          EOF
+          else
+            echo "SDK is not available!!! Exit."
+            exit 1
+          fi
+
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          path: ${{ github.workspace }}/ros_ws/${{ github.event.repository.name }}
+          ref: 5d36172c87aaaaa95d9468549263af243c94b6da
+
+      - name: Download dependencies
+        run: |
+          cd ${WORKSPACE}
+          git clone https://github.com/quic-qrb-ros/lib_mem_dmabuf.git
+          git clone https://github.com/quic-qrb-ros/qrb_ros_imu.git
+        
+      - name: build
+        run: |
+          cd ${SDK_DIR}
+          umask 022
+          . environment-setup-armv8-2a-qcom-linux
+          cd ${WORKSPACE}
+          export AMENT_PREFIX_PATH="${OECORE_TARGET_SYSROOT}/usr;${OECORE_NATIVE_SYSROOT}/usr"
+          export PYTHONPATH=${PYTHONPATH}:${OECORE_TARGET_SYSROOT}/usr/lib/python3.10/site-packages
+
+          colcon build --merge-install --cmake-args \
+            -DPython3_ROOT_DIR=${OECORE_TARGET_SYSROOT}/usr \
+            -DPython3_NumPy_INCLUDE_DIR=${OECORE_TARGET_SYSROOT}/usr/lib/python3.10/site-packages/numpy/core/include \
+            -DPYTHON_SOABI=cpython-310-aarch64-linux-gnu -DCMAKE_STAGING_PREFIX=$(pwd)/install \
+            -DCMAKE_PREFIX_PATH=$(pwd)/install/share \
+            -DBUILD_TESTING=OFF
